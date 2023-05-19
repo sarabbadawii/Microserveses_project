@@ -1,0 +1,64 @@
+version: '3.7'
+
+services: #This is the top-level key for defining the various services that make up the application.
+  zookeeper: #This is the name of the first service, which is running the ZooKeeper server. It is based on the wurstmeister/zookeeper Docker image
+    container_name: zookeeper #his specifies the name of the container that will be created for the ZooKeeper service
+    image: wurstmeister/zookeeper #This specifies the Docker image that will be used to create the ZooKeeper container
+    ports: #This specifies the ports that will be exposed from the container and mapped to the host machine.
+        - 2181:2181 #This specifies that port 2181 in the container will be exposed as port 2181 on the host machine.
+  kafka: #This is the name of the second service, which is running the Kafka broker. It is based on the wurstmeister/kafka Docker image
+    container_name: kafka #his specifies the name of the container that will be created for the Kafka service
+    image: wurstmeister/kafka #This specifies the Docker image that will be used to create the Kafka container
+    ports: #This specifies the ports that will be exposed from the container and mapped to the host machine
+      - 9092:9092 #This specifies that port 9092 in the container will be exposed as port 9092 on the host machine
+    volumes: #This specifies the volumes that will be mounted in the container
+      - ./data/kafka:/var/run/docker.sock #This specifies that the ./data/kafka directory on the host machine will be mounted as /var/run/docker.sock in the container
+    environment: #This sets environment variables that will be available inside the container.
+      - KAFKA_ADVERTISED_HOST_NAME=kafka
+      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
+    depends_on: #This specifies the services that need to be started before this service can be started.
+      - zookeeper #This specifies that the ZooKeeper service must be started before the Kafka service can be started
+  postgres: #This is the name of the third service, which is running the PostgreSQL database server. It is based on the postgres Docker image
+    container_name: postgres # This specifies the name of the container that will be created for the PostgreSQL service
+    image: postgres #This specifies the Docker image that will be used to create the PostgreSQL container
+    ports: #This specifies the ports that will be exposed from the container and mapped to the host machine
+      - 5432:5432 #This specifies that port 5432 in the container will be exposed as port 5432 on the host machine.
+    volumes: #This specifies the volumes that will be mounted in the container.
+      - ./data/postgres:/var/lib/postgresql/data #This specifies that the ./data/postgres directory on the host machine will be mounted as /var/lib/postgresql/data in the container.
+    environment: #This sets environment variables that will be available inside the container
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=postgres
+      - POSTGRES_USER=postgres 
+  instructor: #This is the name of the fourth service, which is running an instructor application. It is built using the Dockerfile in the ./instructor directory.
+    container_name: instructor #his specifies the name of the container that will be created for the instructor service
+    build: ./instructor #This specifies the location of the Dockerfile used to build the instructor container
+    ports:
+      - 8080:8080
+    volumes:
+      - ./instructor:/instructor
+    environment:
+      - PORT=8080
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - KAFKA_TOPIC=topic1
+    depends_on:
+      - kafka
+  student: #This is the name of the fifth service, which is running a student application. It is built using the Dockerfile in the ./student directory.
+    container_name: student #This specifies the name of the container that will be created for the student service
+    build: ./student #This specifies the location of the Dockerfile used to build the student container.
+    ports: #his specifies the ports that will be exposed from the container and mapped to the host machine.
+      - 8081:8081
+    volumes: #This specifies the volumes that will be mounted in the container
+      - ./student:/student #This specifies that the ./student directory on the host machine will be mounted as /student in the container.
+    environment: #This sets environment variables that will be available inside the container
+      - PORT=8081
+      - POSTGRES_URL=postgres://postgres:postgres@postgres:5432/postgres
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - KAFKA_TOPIC=topic1
+    depends_on:
+      - postgres
+      - kafka
+      - instructor
+# this Docker Compose file defines a multi-container application with a ZooKeeper server,
+# a Kafka broker, a PostgreSQL database server, an instructor application,
+# and a student application. The services communicate with each other using Kafka topics,
+# and the instructor and student applications use the PostgreSQL database to store data      
